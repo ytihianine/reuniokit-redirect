@@ -23,6 +23,7 @@ const fallbackListEl = document.getElementById("fallback-list");
 const spinnerEl = document.getElementById("spinner");
 const headlineEl = document.getElementById("headline");
 const subtitleEl = document.getElementById("subtitle");
+const ctaEl = document.getElementById("cta");
 const goButton = document.getElementById("go-button");
 
 function addRow(url) {
@@ -45,7 +46,7 @@ function addRow(url) {
 }
 
 function updateRow(li, result) {
-  li.className = result.ok ? (result.confirmed ? "ok" : "warn") : "err";
+  li.className = result.ok ? "ok" : "err";
   const state = li.querySelector(".state");
   if (result.confirmed) state.textContent = "200 OK";
   else if (result.ok) state.textContent = "répondu (statut masqué)";
@@ -107,10 +108,12 @@ function redirect(url) {
 function showGoButton(url) {
   spinnerEl.classList.add("hidden");
   headlineEl.textContent = "Redirection disponible";
-  subtitleEl.textContent =
-    "L'adresse suivante est accessible. Cliquez pour continuer :";
+  subtitleEl.textContent = "L'adresse suivante est accessible.";
+  ctaEl.textContent =
+    "Cliquez sur le bouton pour être redirigé vers le site fonctionnel.";
   goButton.textContent = url;
   goButton.onclick = () => redirect(url);
+  ctaEl.classList.remove("hidden");
   goButton.classList.remove("hidden");
 }
 
