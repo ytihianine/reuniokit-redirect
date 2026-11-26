@@ -6,7 +6,6 @@
   --muted: #6b7280;
   --accent: #2563eb;
   --ok: #16a34a;
-  --warn: #d97706;
   --err: #dc2626;
   --border: #e5e7eb;
 }
@@ -83,15 +82,18 @@ li .state {
 li.pending .dot { background: var(--accent); animation: pulse 1s ease-in-out infinite; }
 li.ok .dot { background: var(--ok); }
 li.ok .state { color: var(--ok); }
-li.warn .dot { background: var(--warn); }
-li.warn .state { color: var(--warn); }
 li.err .dot { background: var(--err); }
 li.err .state { color: var(--err); }
 @keyframes pulse { 50% { opacity: 0.3; } }
 a { color: var(--accent); }
+.cta {
+  margin: 20px 0 0;
+  font-weight: 600;
+  color: var(--text);
+}
 #go-button {
   width: 100%;
-  margin-top: 20px;
+  margin-top: 12px;
   padding: 12px 16px;
   font-size: 15px;
   font-weight: 600;
