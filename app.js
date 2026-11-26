@@ -11,7 +11,7 @@ const TIMEOUT_MS = 6000;
 // Contact à indiquer si aucun site ne fonctionne.
 const CONTACT = "mission-innovation@finances.gouv.fr";
 // Intervalle entre deux sondes automatiques (60 s).
-const CHECK_INTERVAL_MS = 60000;
+const CHECK_INTERVAL_MS = 15000;
 // ===========================================
 
 // NB : tous les textes de la page sont statifs ; en cours de route seules
