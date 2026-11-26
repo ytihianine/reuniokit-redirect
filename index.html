@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Redirection…</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="card" id="loading">
+    <div class="spinner" id="spinner" aria-hidden="true"></div>
+    <h1 id="headline">Redirection…</h1>
+    <p id="subtitle">Recherche d'une adresse qui répond par <strong>200&nbsp;OK</strong>.</p>
+    <ul id="probe-list"></ul>
+    <p id="cta" class="cta hidden"></p>
+    <button id="go-button" type="button" class="hidden"></button>
+  </div>
+
+  <div class="card hidden" id="error">
+    <h1>Aucune URL n'est accessible</h1>
+    <p>Aucun candidat n'a répondu <strong>200&nbsp;OK</strong>. Vous pouvez les essayer manuellement :</p>
+    <ul id="fallback-list"></ul>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
