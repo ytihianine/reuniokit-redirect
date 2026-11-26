@@ -46,8 +46,8 @@ function addRow(url) {
 }
 
 // Seule la classe de la ligne (donc la couleur du point) change — jamais le texte.
-function updateRow(li, result) {
-  li.className = result.ok ? "ok" : "err";
+function updateRow(li) {
+  li.className = li._ok ? "ok" : "err";
 }
 
 function withTimeout(ms) {
@@ -72,26 +72,24 @@ async function fetchOnce(url, mode) {
 }
 
 // Sonde une adresse.
-//   confirmed: true  -> on a vu un vrai statut "200 OK"
-//   ok: true         -> le serveur a répondu (mais le navigateur a masqué le statut)
+//   ok: true  -> le serveur a répondu avec un statut 200.
+//   ok: false -> le serveur n'a pas répondu 200 (ou est inaccessible).
+//
+// Seule la vérification stricte est utilisée : on ne considère le serveur
+// comme accessible que si on peut lire le statut 200. Cette approche
+// exige que le serveur cible envoie des en-têtes CORS (Access-Control-
+// Allow-Origin: *), ou que la page soit servie depuis la même origine.
+//
+// Sans ces en-têtes, le navigateur ne peut pas lire le statut dans un
+// contexte inter-origine. Le serveur sera alors considéré comme inaccessible
+// même s'il répond avec un 200 — c'est un choix délibéré : il vaut mieux
+// ne pas rediriger que de rediriger vers une erreur 404 par exemple.
 async function probe(url) {
-  // Vérification stricte : fonctionne si la page est servie depuis la même
-  // origine que l'adresse, ou si l'adresse envoie des en-têtes CORS (la
-  // plupart des hébergements statiques envoient Access-Control-Allow-Origin: *).
   try {
     const res = await fetchOnce(url, "cors");
-    if (res.status === 200) return { ok: true, confirmed: true };
-    return { ok: false, error: "HTTP " + res.status };
+    return { ok: res.status === 200 };
   } catch {
-    // Bloqué par CORS ou erreur réseau : nouvelle tentative opaque. Le
-    // navigateur résout la requête dès que le serveur envoie une réponse,
-    // ce qui permet au moins de savoir si le serveur est en ligne.
-    try {
-      await fetchOnce(url, "no-cors");
-      return { ok: true, confirmed: false };
-    } catch {
-      return { ok: false, error: "inaccessible" };
-    }
+    return { ok: false };
   }
 }
 
@@ -111,15 +109,14 @@ async function main() {
     candidates.map(async (url) => {
       const row = addRow(url);
       const result = await probe(url);
-      updateRow(row, result);
-      return { url, ...result };
+      row._ok = result.ok;
+      updateRow(row);
+      return { url, ok: result.ok };
     })
   );
 
-  // 1) De préférence un 200 OK confirmé, dans l'ordre de la liste.
-  const confirmed = results.find((r) => r.confirmed);
-  // 2) À défaut, la première adresse dont le serveur a répondu.
-  const target = confirmed || results.find((r) => r.ok);
+  // La première adresse dont le serveur a répondu avec 200 OK.
+  const target = results.find((r) => r.ok);
   if (target) enableButton(target.url);
   // Sinon le bouton reste inactif : le visiteur est invité à écrire au contact.
 }
