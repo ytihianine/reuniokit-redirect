@@ -9,7 +9,9 @@ const CANDIDATES = [
 // Délai d'attente pour chaque adresse avant d'abandonner.
 const TIMEOUT_MS = 6000;
 // Contact à indiquer si aucun site ne fonctionne.
-const CONTACT = "support@exemple.com";
+const CONTACT = "mission-innovation@finances.gouv.fr";
+// Intervalle entre deux sondes automatiques (60 s).
+const CHECK_INTERVAL_MS = 60000;
 // ===========================================
 
 // NB : tous les textes de la page sont statifs ; en cours de route seules
@@ -22,6 +24,8 @@ if (urlParam) {
 }
 
 const probeListEl = document.getElementById("probe-list");
+let rows = [];
+let targetUrl = null;
 const goButton = document.getElementById("go-button");
 const contactLink = document.getElementById("contact-link");
 
@@ -46,8 +50,9 @@ function addRow(url) {
 }
 
 // Seule la classe de la ligne (donc la couleur du point) change — jamais le texte.
-function updateRow(li) {
-  li.className = li._ok ? "ok" : "err";
+function updateRow(li, ok) {
+  li._ok = ok;
+  li.className = ok ? "ok" : "err";
 }
 
 function withTimeout(ms) {
@@ -93,32 +98,48 @@ async function probe(url) {
   }
 }
 
-// Active le bouton uniquement si une adresse est disponible.
-function enableButton(url) {
-  goButton.disabled = false;
-  goButton.onclick = () => location.replace(url);
+function syncButton() {
+  if (targetUrl) {
+    goButton.disabled = false;
+    goButton.onclick = () => location.replace(targetUrl);
+  } else {
+    goButton.disabled = true;
+    goButton.onclick = null;
+  }
 }
 
-async function main() {
+async function runProbes() {
+  rows = [];
+  targetUrl = null;
+  goButton.disabled = true;
+  goButton.onclick = null;
+
   // Ignore les adresses qui ne sont pas des URL http(s) absolues.
   const candidates = CANDIDATES.filter((url) => /^https?:\/\//i.test(url));
-  if (candidates.length === 0) return; // le bouton reste inactif
+  if (candidates.length === 0) return;
 
   // Sondes en parallèle ; c'est le résultat qui compte, pas la vitesse.
   const results = await Promise.all(
     candidates.map(async (url) => {
       const row = addRow(url);
+      rows.push(row);
       const result = await probe(url);
-      row._ok = result.ok;
-      updateRow(row);
+      updateRow(row, result.ok);
       return { url, ok: result.ok };
     })
   );
 
   // La première adresse dont le serveur a répondu avec 200 OK.
   const target = results.find((r) => r.ok);
-  if (target) enableButton(target.url);
+  if (target) targetUrl = target.url;
+  syncButton();
   // Sinon le bouton reste inactif : le visiteur est invité à écrire au contact.
+}
+
+async function main() {
+  await runProbes();
+  // Relance automatique toutes les 60 s (rafraîchit le cache et le ping).
+  setInterval(runProbes, CHECK_INTERVAL_MS);
 }
 
 main();
