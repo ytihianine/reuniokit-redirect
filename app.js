@@ -1,30 +1,33 @@
 "use strict";
 
 // ============== CONFIGURATION ==============
-// The two candidate URLs, tried in this order (first wins on a tie).
+// Les deux URL candidates, dans cet ordre (la première l'emporte en cas d'égalité).
 const CANDIDATES = [
   "https://reuniokit.lab.sspcloud.fr/",
-  "https://fallback.example.com",
+  "https://reuniokit.lab.incubateur.finances.rie.gouv.fr/",
 ];
-// How long to wait for each candidate before giving up.
+// Délai d'attente pour chaque adresse avant d'abandonner.
 const TIMEOUT_MS = 6000;
+// Contact à indiquer si aucun site ne fonctionne.
+const CONTACT = "support@exemple.com";
 // ===========================================
 
-// Optional override for testing: ?urls=https://a.example,https://b.example
+// NB : tous les textes de la page sont statifs ; en cours de route seules
+// les couleurs des pastilles et l'état du bouton changent, jamais le texte.
+
+// Remplacement pour les tests : ?urls=https://a.example,https://b.example
 const urlParam = new URLSearchParams(location.search).get("urls");
 if (urlParam) {
   CANDIDATES = urlParam.split(",").map((s) => s.trim()).filter(Boolean);
 }
 
-const loadingEl = document.getElementById("loading");
-const errorEl = document.getElementById("error");
 const probeListEl = document.getElementById("probe-list");
-const fallbackListEl = document.getElementById("fallback-list");
-const spinnerEl = document.getElementById("spinner");
-const headlineEl = document.getElementById("headline");
-const subtitleEl = document.getElementById("subtitle");
-const ctaEl = document.getElementById("cta");
 const goButton = document.getElementById("go-button");
+const contactLink = document.getElementById("contact-link");
+
+// Lien de contact, renseigné une seule fois au chargement.
+contactLink.href = "mailto:" + CONTACT;
+contactLink.textContent = CONTACT;
 
 function addRow(url) {
   const li = document.createElement("li");
@@ -33,24 +36,18 @@ function addRow(url) {
   const dot = document.createElement("span");
   dot.className = "dot";
 
-  const code = document.createElement("code");
-  code.textContent = url;
+  const link = document.createElement("a");
+  link.href = url;
+  link.textContent = url;
 
-  const state = document.createElement("span");
-  state.className = "state";
-  state.textContent = "vérification…";
-
-  li.append(dot, code, state);
+  li.append(dot, link);
   probeListEl.appendChild(li);
   return li;
 }
 
+// Seule la classe de la ligne (donc la couleur du point) change — jamais le texte.
 function updateRow(li, result) {
   li.className = result.ok ? "ok" : "err";
-  const state = li.querySelector(".state");
-  if (result.confirmed) state.textContent = "200 OK";
-  else if (result.ok) state.textContent = "répondu (statut masqué)";
-  else state.textContent = result.error || "échec";
 }
 
 function withTimeout(ms) {
@@ -74,21 +71,21 @@ async function fetchOnce(url, mode) {
   }
 }
 
-// Probe one candidate.
-//   confirmed: true  -> we saw an actual "200 OK" status
-//   ok: true         -> the host answered (but the browser hid the status)
+// Sonde une adresse.
+//   confirmed: true  -> on a vu un vrai statut "200 OK"
+//   ok: true         -> le serveur a répondu (mais le navigateur a masqué le statut)
 async function probe(url) {
-  // Strict check: works if the page is served from the same origin as the
-  // candidate, or if the candidate sends CORS headers (most static hosts
-  // send Access-Control-Allow-Origin: * by default).
+  // Vérification stricte : fonctionne si la page est servie depuis la même
+  // origine que l'adresse, ou si l'adresse envoie des en-têtes CORS (la
+  // plupart des hébergements statiques envoient Access-Control-Allow-Origin: *).
   try {
     const res = await fetchOnce(url, "cors");
     if (res.status === 200) return { ok: true, confirmed: true };
     return { ok: false, error: "HTTP " + res.status };
   } catch {
-    // CORS-blocked or network error: retry opaquely. The browser still
-    // resolves the request when the host sends *any* HTTP response, so at
-    // least we learn whether the host is up.
+    // Bloqué par CORS ou erreur réseau : nouvelle tentative opaque. Le
+    // navigateur résout la requête dès que le serveur envoie une réponse,
+    // ce qui permet au moins de savoir si le serveur est en ligne.
     try {
       await fetchOnce(url, "no-cors");
       return { ok: true, confirmed: false };
@@ -98,45 +95,18 @@ async function probe(url) {
   }
 }
 
-function redirect(url) {
-  document.title = "Redirection vers " + url;
-  location.replace(url);
-}
-
-// La redirection n'est jamais automatique : on affiche un bouton
-// que l'utilisateur doit cliquer pour continuer.
-function showGoButton(url) {
-  spinnerEl.classList.add("hidden");
-  headlineEl.textContent = "Redirection disponible";
-  subtitleEl.textContent = "L'adresse suivante est accessible.";
-  ctaEl.textContent =
-    "Cliquez sur le bouton pour être redirigé vers le site fonctionnel.";
-  goButton.textContent = url;
-  goButton.onclick = () => redirect(url);
-  ctaEl.classList.remove("hidden");
-  goButton.classList.remove("hidden");
-}
-
-function showError() {
-  loadingEl.classList.add("hidden");
-  errorEl.classList.remove("hidden");
-  document.title = "Échec de la redirection";
-  for (const url of CANDIDATES) {
-    const li = document.createElement("li");
-    const a = document.createElement("a");
-    a.href = url;
-    a.textContent = url;
-    li.appendChild(a);
-    fallbackListEl.appendChild(li);
-  }
+// Active le bouton uniquement si une adresse est disponible.
+function enableButton(url) {
+  goButton.disabled = false;
+  goButton.onclick = () => location.replace(url);
 }
 
 async function main() {
-  // Ignore candidates that are not absolute http(s) URLs.
+  // Ignore les adresses qui ne sont pas des URL http(s) absolues.
   const candidates = CANDIDATES.filter((url) => /^https?:\/\//i.test(url));
-  if (candidates.length === 0) return showError();
+  if (candidates.length === 0) return; // le bouton reste inactif
 
-  // Probe in parallel; resolution is what matters, not which finishes first.
+  // Sondes en parallèle ; c'est le résultat qui compte, pas la vitesse.
   const results = await Promise.all(
     candidates.map(async (url) => {
       const row = addRow(url);
@@ -146,16 +116,12 @@ async function main() {
     })
   );
 
-  // 1) Prefer a confirmed 200 OK, in list order (first wins).
+  // 1) De préférence un 200 OK confirmé, dans l'ordre de la liste.
   const confirmed = results.find((r) => r.confirmed);
-  if (confirmed) return showGoButton(confirmed.url);
-
-  // 2) Fallback: the first candidate whose host answered at all.
-  const answered = results.find((r) => r.ok);
-  if (answered) return showGoButton(answered.url);
-
-  // 3) Nothing worked — let the user try manually.
-  showError();
+  // 2) À défaut, la première adresse dont le serveur a répondu.
+  const target = confirmed || results.find((r) => r.ok);
+  if (target) enableButton(target.url);
+  // Sinon le bouton reste inactif : le visiteur est invité à écrire au contact.
 }
 
 main();
