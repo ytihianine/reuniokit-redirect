@@ -24,8 +24,18 @@ if (urlParam) {
 }
 
 const probeListEl = document.getElementById("probe-list");
+const countdownEl = document.getElementById("countdown");
 let rows = [];
 let targetUrl = null;
+let remaining = Math.ceil(CHECK_INTERVAL_MS / 1000);
+
+// Crée les lignes de sondage une seule fois.
+function initRows() {
+  rows = [];
+  for (const url of CANDIDATES) {
+    rows.push(addRow(url));
+  }
+}
 const goButton = document.getElementById("go-button");
 const contactLink = document.getElementById("contact-link");
 
@@ -109,22 +119,26 @@ function syncButton() {
 }
 
 async function runProbes() {
-  rows = [];
   targetUrl = null;
   goButton.disabled = true;
   goButton.onclick = null;
 
-  // Ignore les adresses qui ne sont pas des URL http(s) absolues.
+  // Ignorer les adresses qui ne sont pas des URL http(s) absolues.
   const candidates = CANDIDATES.filter((url) => /^https?:\/\//i.test(url));
   if (candidates.length === 0) return;
+
+  // Marquer toutes les lignes comme "en cours".
+  for (const row of rows) {
+    row.className = "pending";
+  }
 
   // Sondes en parallèle ; c'est le résultat qui compte, pas la vitesse.
   const results = await Promise.all(
     candidates.map(async (url) => {
-      const row = addRow(url);
-      rows.push(row);
+      const idx = CANDIDATES.indexOf(url);
+      const row = rows[idx];
       const result = await probe(url);
-      updateRow(row, result.ok);
+      if (row) updateRow(row, result.ok);
       return { url, ok: result.ok };
     })
   );
@@ -137,9 +151,18 @@ async function runProbes() {
 }
 
 async function main() {
+  initRows();
   await runProbes();
-  // Relance automatique toutes les 60 s (rafraîchit le cache et le ping).
-  setInterval(runProbes, CHECK_INTERVAL_MS);
+  // Compte à rebours et relance automatique.
+  setInterval(() => {
+    remaining--;
+    countdownEl.textContent =
+      remaining > 0 ? `Nouveau test dans ${remaining} seconde${remaining > 1 ? 's' : ''}` : '';
+    if (remaining <= 0) {
+      remaining = Math.ceil(CHECK_INTERVAL_MS / 1000);
+      runProbes();
+    }
+  }, 1000);
 }
 
 main();
